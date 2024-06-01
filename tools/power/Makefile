@@ -9,7 +9,12 @@ $(error ERROR: nvcc version >= $(NVCC_VER_REQ) required to compile an nvbit tool
 endif
 
 NVBIT_PATH=../../core
-INCLUDES=-I$(NVBIT_PATH) 
+ifeq ($(VERBOSE),1)
+	INCLUDES=-I$(NVBIT_PATH) -DDEBUG
+else
+	INCLUDES=-I$(NVBIT_PATH)
+endif
+
 
 LIBS=-L$(NVBIT_PATH) -lnvbit -lnvidia-ml
 NVCC_PATH=-L $(subst bin/nvcc,lib64,$(shell which nvcc | tr -s /))

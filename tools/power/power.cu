@@ -45,7 +45,7 @@ uint32_t kernel_id = 0;
 
 /* total instruction counter, maintained in system memory, incremented by
  * "counter" every time a kernel completes  */
-uint64_t tot_app_instrs = 0;
+// uint64_t tot_app_instrs = 0;
 
 /* kernel instruction counter, updated by the GPU */
 __managed__ uint64_t counter = 0;
@@ -61,9 +61,7 @@ int exclude_pred_off = 0;
 int active_from_start = 1;
 bool mangled = false;
 
-/* used to select region of insterest when active from start is off */
-bool active_region = true;
-
+// 
 /* a pthread mutex, used to prevent multiple kernels to run concurrently and
  * therefore to "corrupt" the counter variable */
 pthread_mutex_t mutex;
@@ -78,11 +76,25 @@ myNvml *myNvml_ptr = nullptr;
  * environment variables values which we use as input arguments to the tool */
 void nvbit_at_init()
 {
+    debug_printf("TOOL INIT\n");
+    int device = std::atoi(getenv("CUDA_VISIBLE_DEVICES")); // Same name with NVBit
+    debug_printf("device = %d\n", device);
+    int sampling_interval = std::atoi(getenv("SAMPLING_INTERVAL"));
+    debug_printf("sampling interval= %d\n", sampling_interval);
+    int reset_interval= std::atoi(getenv("RESET_INTERVAL"));
+    debug_printf("reset_interval= %d\n", reset_interval);
     int freq_mode = std::atoi(getenv("FREQ_MODE"));
-    int interval = std::atoi(getenv("INTERVAL"));
-    debug_printf("freq_mode: %d, interval: %d\n", freq_mode, interval);
+    debug_printf("freq_mode= %d\n", freq_mode);
+    int bin_policy= std::atoi(getenv("BIN_POLICY"));
+    debug_printf("bin_policy= %d\n", bin_policy);
+    int min_freq = std::atoi(getenv("MIN_FREQ"));
+    debug_printf("min_freqw= %d\n", min_freq);
+    int max_freq = std::atoi(getenv("MAX_FREQ"));
+    debug_printf("max_freqw= %d\n", max_freq);
+    int step_freq = std::atoi(getenv("STEP_FREQ"));
+    debug_printf("step_freq= %d\n", step_freq);
 
-    myNvml_ptr = new myNvml(freq_mode, interval);
+    myNvml_ptr = new myNvml(device, sampling_interval, reset_interval, freq_mode, bin_policy, min_freq, max_freq, step_freq);
     /* just make sure all managed variables are allocated on GPU */
     setenv("CUDA_MANAGED_FORCE_DEVICE_ALLOC", "1", 1);
 
@@ -113,10 +125,6 @@ void nvbit_at_init()
                 "Print kernel names mangled or not");
 
     GET_VAR_INT(verbose, "TOOL_VERBOSE", 0, "Enable verbosity inside the tool");
-    if (active_from_start == 0)
-    {
-        active_region = false;
-    }
 
     std::string pad(100, '-');
     printf("%s\n", pad.c_str());
@@ -125,77 +133,6 @@ void nvbit_at_init()
 
 /* Set used to avoid re-instrumenting the same functions multiple times */
 std::unordered_set<CUfunction> already_instrumented;
-
-void instrument_function_if_needed(CUcontext ctx, CUfunction func)
-{
-    /* Get related functions of the kernel (device function that can be
-     * called by the kernel) */
-    std::vector<CUfunction> related_functions =
-        nvbit_get_related_functions(ctx, func);
-
-    /* add kernel itself to the related function vector */
-    related_functions.push_back(func);
-
-    /* iterate on function */
-    for (auto f : related_functions)
-    {
-        /* "recording" function was instrumented, if set insertion failed
-         * we have already encountered this function */
-        if (!already_instrumented.insert(f).second)
-        {
-            continue;
-        }
-
-        /* Get the vector of instruction composing the loaded CUFunction "f" */
-        const std::vector<Instr *> &instrs = nvbit_get_instrs(ctx, f);
-
-        /* If verbose we print function name and number of" static" instructions
-         */
-        if (verbose)
-        {
-            printf("inspecting %s - num instrs %ld\n",
-                   nvbit_get_func_name(ctx, f), instrs.size());
-        }
-
-        /* We iterate on the vector of instruction */
-        for (auto i : instrs)
-        {
-            /* Check if the instruction falls in the interval where we want to
-             * instrument */
-            if (i->getIdx() >= instr_begin_interval &&
-                i->getIdx() < instr_end_interval)
-            {
-                /* If verbose we print which instruction we are instrumenting
-                 * (both offset in the function and SASS string) */
-                if (verbose == 1)
-                {
-                    i->print();
-                }
-                else if (verbose == 2)
-                {
-                    i->printDecoded();
-                }
-                /* Insert a call to "count_instrs" before the instruction "i" */
-                nvbit_insert_call(i, "count_instrs", IPOINT_BEFORE);
-                if (exclude_pred_off)
-                {
-                    /* pass predicate value */
-                    nvbit_add_call_arg_guard_pred_val(i);
-                }
-                else
-                {
-                    /* pass always true */
-                    nvbit_add_call_arg_const_val32(i, 1);
-                }
-
-                /* add count warps option */
-                nvbit_add_call_arg_const_val32(i, count_warp_level);
-                /* add pointer to counter location */
-                nvbit_add_call_arg_const_val64(i, (uint64_t)&counter);
-            }
-        }
-    }
-}
 
 /* This call-back is triggered every time a CUDA driver call is encountered.
  * Here we can look for a particular CUDA driver call by checking at the
@@ -226,29 +163,8 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
              * 4. Reset the kernel instruction counter */
 
             pthread_mutex_lock(&mutex);
-            // instrument_function_if_needed(ctx, p->f);
 
-            if (active_from_start)
-            {
-                if (kernel_id >= start_grid_num && kernel_id < end_grid_num)
-                {
-                    active_region = true;
-                }
-                else
-                {
-                    active_region = false;
-                }
-            }
-            /*
-            if (active_region)
-            {
-                nvbit_enable_instrumented(ctx, p->f, true);
-            }
-            else
-            {
-                nvbit_enable_instrumented(ctx, p->f, false);
-            }
-            */
+
             debug_printf("%s\n", nvbit_get_func_name(ctx, p->f));
             std::string inputString(nvbit_get_func_name(ctx, p->f));
             debug_printf("input_string: %s\n", inputString.c_str());
@@ -264,7 +180,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             }
 
             counter = 0;
-            myNvml_ptr->measure_init();
+            // myNvml_ptr->measure_init();
             myNvml_ptr->measure_start(result.c_str());
         }
         else
@@ -277,7 +193,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
              * 4. Release the lock*/
             CUDA_SAFECALL(cudaDeviceSynchronize());
             myNvml_ptr->measure_stop();
-            tot_app_instrs += counter;
+
             int num_ctas = 0;
             if (cbid == API_CUDA_cuLaunchKernel_ptsz ||
                 cbid == API_CUDA_cuLaunchKernel)
@@ -288,23 +204,9 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             pthread_mutex_unlock(&mutex);
         }
     }
-    else if (cbid == API_CUDA_cuProfilerStart && is_exit)
-    {
-        if (!active_from_start)
-        {
-            active_region = true;
-        }
-    }
-    else if (cbid == API_CUDA_cuProfilerStop && is_exit)
-    {
-        if (!active_from_start)
-        {
-            active_region = false;
-        }
-    }
 }
 
 void nvbit_at_term()
 {
-    debug_printf("Total app instructions: %ld\n", tot_app_instrs);
+    // debug_printf("Total app instructions: %ld\n", tot_app_instrs);
 }

@@ -9,60 +9,48 @@
 #include <iostream>
 #include <unordered_map>
 #include <fstream>
-#define TARGET_DEVICE 0
+#include <cassert>
 
 class myNvml
-{ 
+{
 public:
     void measure_init();
     void measure_fin();
     void measure_start(const char *kernel_name);
     void measure_stop();
+    void reset();
+    void get_time();
     void measure_energy_thread();
     // benchmark name is given by environment varialbe "BENCH_NAME"
-    myNvml(int mode, int interval)
-    {
-        const char *envVarValue = std::getenv("BENCH_NAME");
-        debug_printf("c_str:BENCH_NAME= %s\n", envVarValue);
-        if (envVarValue != NULL)
-        {
-            strncpy(bench_name, envVarValue, sizeof(bench_name));
-        }
-        else
-        {
-            strncpy(bench_name, "unknown", sizeof(bench_name));
-        }
-        freq_mode = mode;
-        start_flag = 0;
-        CBT = new CallBackTimer();
-        bm = new BinManager(1, 500, 2000, 100, 1);
-        this->interval = interval;
-        num_call = 0;
-        prev_energy = 0;
-        prev_power = 0;
-    }
-
-    ~myNvml()
-    {
-        delete CBT;
-        delete bm;
-    }
+    myNvml(int device, int sampling_interval, int reset_interval, int freq_mode, int bin_policy, int min_freq, int max_freq, int step_freq);
+    ~myNvml();
 
 private:
+    cudaEvent_t start, stop;
+    int target_device;
+    int _min_freq;
+    int _max_freq;
+    int _step_freq;
     int start_flag;
-    int interval;
+    int _sampling_interval;
+    int _reset_interval;
     CallBackTimer *CBT;
     int cpu_model;
     unsigned int num_call;
+    bool isFixed;
     nvmlDevice_t device;
     unsigned long long prev_energy;
     unsigned long long prev_power;
+    unsigned long long total_power;
+    unsigned long long prev_avg_power;
     int freq;
     char bench_name[128];
     char kernel_name[128];
     FILE *ofile;
+    FILE *otfile;
     BinManager *bm;
-    int freq_mode;
+    int _freq_mode;
+    int _bin_policy;
     unordered_map<string, unsigned int> kernel_map;
 };
 

@@ -1,91 +1,93 @@
 #include <iostream>
+#include <algorithm>
 #include <vector>
 #include <random>
 #include "bin.h"
+#include <cassert>
 
-inline unsigned int Bin::getFrequency()
+BinManager::BinManager(int start_frq, int end_frq, int distance, int sampling_interval, int reset_interval)
+    : start_frq(start_frq), end_frq(end_frq), distance(distance), sampling_interval(sampling_interval), reset_interval(reset_interval)
 {
-    if (!is_full())
-    {
-        return frequency;
-    }
-    return 0;
-}
+    num_bin_types = (end_frq - start_frq) / distance + 1;
+    debug_printf("Number of bin types: %d\n", num_bin_types);
+    assert(("num_bin_type should be bigger than 1", num_bin_types > 1));
 
-inline void Bin::incrementCounter()
-{
-    if (!is_full())
-    {
-        debug_printf("Incrementing counter for bin with frequency:%d\n", frequency);
-        counter++;
-    }
-}
+    sample_per_reset = reset_interval / sampling_interval;
+    debug_printf("sample per reset: %d\n", sample_per_reset);
 
-inline void Bin::resetCounter()
-{
-    debug_printf("Resetting counter for bin with %d\n", frequency);
-    counter = 0;
-}
-
-inline bool Bin::is_full()
-{
-    debug_printf("Counter: %d\n", counter);
-    debug_printf("Maximum Counter: %d\n", maximumCounter);
-    return (counter == maximumCounter);
-}
-
-void BinManager::addBin(int freq, int maxCounter)
-{
-    bins.emplace_back(freq, maxCounter);
+    step_in_bin = ((sample_per_reset - num_bin_types) * 2) / (pow(num_bin_types, 2) - num_bin_types);
+    debug_printf("step in bin: %d\n", step_in_bin);
+    assert(step_in_bin >= 1);
 }
 
 // Function to get the frequency of a randomly chosen bin with counter < maximumCounter
-unsigned int BinManager::getFreq()
+
+int BinManager::getFreq()
 {
-    // Collect eligible bins
-    std::vector<int> eligibleBins;
-    for (long unsigned int i = 0; i < bins.size(); i++)
-    {
-        if (!bins[i].is_full())
-        {
-            // cout << "Bin " << i << " is eligible" << endl;
-            eligibleBins.push_back(i);
-        }
-        // else
-        // cout << "Bin " << i << " is uneligible" << endl;
-    }
-    if (eligibleBins.empty())
+    if (freq_bins.empty())
     {
         debug_printf("No eligible bins found!\n");
-        return 0;
+        return -1;
     }
-
-    // Randomly choose a bin from eligible bins
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::uniform_int_distribution<int> dist(0, eligibleBins.size() - 1);
-
-    int selectedBinIndex = eligibleBins[dist(gen)];
-    int selectedBinFreq = bins[selectedBinIndex].getFrequency();
-    debug_printf("Selected Bin Index:%d\n", selectedBinIndex);
-    debug_printf("Selected Bin Frequency:%d\n", selectedBinFreq);
-
-    // Increment the counter of the selected bin
-    bins[selectedBinIndex].incrementCounter();
-
-    return selectedBinFreq;
+    int freq = freq_bins.back();
+    freq_bins.pop_back();
+    debug_printf("Selected Bin Frequency:%d\n", freq);
+    return freq;
 }
 
 int BinManager::getResetPeriod()
 {
-    return reset_period;
+    return sample_per_reset;
 }
 
-void BinManager::resetBinCounters()
+void BinManager::setBinCounters(int bin_policy)
 {
-    // cout << "Resetting bin counters..." << endl;
-    for (long unsigned int i = 0; i < bins.size(); i++)
+    int start = 0;
+    int end = 0;
+    int step = 0;
+    int bin_step = 0;
+    int cur_height = 1;
+
+    freq_bins.clear();
+    if (bin_policy == BIN_POLICY::FLAT)
     {
-        bins[i].resetCounter();
+        start = start_frq;
+        end = end_frq;
+        step = distance;
+        bin_step = 0;
+        cur_height = sample_per_reset / num_bin_types;
     }
+    else if (bin_policy == BIN_POLICY::INCLINED)
+    {
+        start = start_frq;
+        end = end_frq;
+        step = distance;
+        bin_step = step_in_bin;
+        cur_height = 1;
+    }
+    else if (bin_policy == BIN_POLICY::DECLINED)
+    {
+        start = end_frq;
+        end = start_frq;
+        step = -distance;
+        bin_step = step_in_bin;
+        cur_height = 1;
+    }
+
+    int slot_cnt = 0;
+    assert((start - end) % step == 0);
+    for (int i = start; i != end; i += step)
+    {
+        for (int j = 0; j < cur_height; j++)
+            freq_bins.push_back(i);
+        slot_cnt += cur_height;
+        debug_printf("Added size %d bin with frequency %d\n", cur_height, i);
+        cur_height += bin_step;
+    }
+
+    for (int j = 0; j < sample_per_reset - slot_cnt; j++)
+        freq_bins.push_back(end);
+    debug_printf("Added size %d bin to the last bin with frequency %d\n", sample_per_reset - slot_cnt, end);
+
+    std::random_shuffle(freq_bins.begin(), freq_bins.end());
 }
