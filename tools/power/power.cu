@@ -75,24 +75,7 @@ myNvml *myNvml_ptr = nullptr;
 void nvbit_at_init()
 {
     debug_printf("TOOL INIT\n");
-    int device = std::atoi(getenv("CUDA_VISIBLE_DEVICES")); // Same name with NVBit
-    debug_printf("device = %d\n", device);
-    int sampling_interval = std::atoi(getenv("SAMPLING_INTERVAL"));
-    debug_printf("sampling interval= %d\n", sampling_interval);
-    int reset_interval= std::atoi(getenv("RESET_INTERVAL"));
-    debug_printf("reset_interval= %d\n", reset_interval);
-    int freq_mode = std::atoi(getenv("FREQ_MODE"));
-    debug_printf("freq_mode= %d\n", freq_mode);
-    int bin_policy= std::atoi(getenv("BIN_POLICY"));
-    debug_printf("bin_policy= %d\n", bin_policy);
-    int min_freq = std::atoi(getenv("MIN_FREQ"));
-    debug_printf("min_freqw= %d\n", min_freq);
-    int max_freq = std::atoi(getenv("MAX_FREQ"));
-    debug_printf("max_freqw= %d\n", max_freq);
-    int step_freq = std::atoi(getenv("STEP_FREQ"));
-    debug_printf("step_freq= %d\n", step_freq);
-
-    myNvml_ptr = new myNvml(device, sampling_interval, reset_interval, freq_mode, bin_policy, min_freq, max_freq, step_freq);
+    myNvml_ptr = new myNvml();
     /* just make sure all managed variables are allocated on GPU */
     setenv("CUDA_MANAGED_FORCE_DEVICE_ALLOC", "1", 1);
 

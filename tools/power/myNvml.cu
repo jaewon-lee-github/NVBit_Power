@@ -17,10 +17,9 @@ void check(T result, char const *const func, const char *const file, int const l
 }
 #define checkCudaNvmlErrors(val) check((val), #val, __FILE__, __LINE__)
 
-myNvml::myNvml(int device, int sampling_interval, int reset_interval, int freq_mode, int bin_policy, int min_freq, int max_freq, int step_freq)
+myNvml::myNvml()
 {
     const char *envVarValue = std::getenv("BENCH_NAME");
-    debug_printf("BENCH_NAME= %s\n", envVarValue);
     if (envVarValue != NULL)
     {
         strncpy(bench_name, envVarValue, sizeof(bench_name));
@@ -29,17 +28,27 @@ myNvml::myNvml(int device, int sampling_interval, int reset_interval, int freq_m
     {
         strncpy(bench_name, "unknown", sizeof(bench_name));
     }
-    _freq_mode = freq_mode;
-    _bin_policy = bin_policy;
-    target_device = device;
+    debug_printf("BENCH_NAME= %s\n", bench_name);
+    target_device = std::atoi(getenv("CUDA_VISIBLE_DEVICES")); // Same name with NVBit
+    debug_printf("device = %d\n", target_device);
+    _freq_mode = std::atoi(getenv("FREQ_MODE"));
+    debug_printf("freq_mode= %d\n", _freq_mode);
+    _bin_policy = std::atoi(getenv("BIN_POLICY"));
+    debug_printf("bin_policy= %d\n", _bin_policy);
     start_flag = 0;
+    _min_freq = std::atoi(getenv("MIN_FREQ"));
+    debug_printf("min_freqw= %d\n", _min_freq);
+    _max_freq = std::atoi(getenv("MAX_FREQ"));
+    debug_printf("max_freqw= %d\n", _max_freq);
+    _step_freq = std::atoi(getenv("STEP_FREQ"));
+    debug_printf("step_freq= %d\n", _step_freq);
+    _sampling_interval = std::atoi(getenv("SAMPLING_INTERVAL"));
+    debug_printf("sampling interval= %d\n", _sampling_interval);
+    _reset_interval = std::atoi(getenv("RESET_INTERVAL"));
+    debug_printf("reset_interval= %d\n", _reset_interval);
+
     CBT = new CallBackTimer();
-    _min_freq = min_freq;
-    _max_freq = max_freq;
-    _step_freq = step_freq;
-    _sampling_interval = sampling_interval;
-    _reset_interval = reset_interval;
-    bm = new BinManager(min_freq, max_freq, step_freq, sampling_interval, reset_interval);
+    bm = new BinManager(_min_freq, _max_freq, _step_freq, _sampling_interval, _reset_interval);
     num_call = 0;
     prev_energy = 0;
     prev_power = 0;

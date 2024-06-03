@@ -22,7 +22,7 @@ public:
     void get_time();
     void measure_energy_thread();
     // benchmark name is given by environment varialbe "BENCH_NAME"
-    myNvml(int device, int sampling_interval, int reset_interval, int freq_mode, int bin_policy, int min_freq, int max_freq, int step_freq);
+    myNvml();
     ~myNvml();
 
 private:
