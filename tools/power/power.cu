@@ -47,9 +47,6 @@ uint32_t kernel_id = 0;
  * "counter" every time a kernel completes  */
 // uint64_t tot_app_instrs = 0;
 
-/* kernel instruction counter, updated by the GPU */
-__managed__ uint64_t counter = 0;
-
 /* global control variables for this tool */
 uint32_t instr_begin_interval = 0;
 uint32_t instr_end_interval = UINT32_MAX;
@@ -65,6 +62,7 @@ bool mangled = false;
 /* a pthread mutex, used to prevent multiple kernels to run concurrently and
  * therefore to "corrupt" the counter variable */
 pthread_mutex_t mutex;
+pthread_mutex_t mutex_nvml;
 
 /* Power call back function */
 #include "myNvml.h"
@@ -129,6 +127,9 @@ void nvbit_at_init()
     std::string pad(100, '-');
     printf("%s\n", pad.c_str());
     pthread_mutex_init(&mutex, NULL);
+    pthread_mutex_init(&mutex_nvml, NULL);
+    pthread_mutex_lock(&mutex_nvml);
+    myNvml_ptr->measure_start("");
 }
 
 /* Set used to avoid re-instrumenting the same functions multiple times */
@@ -179,9 +180,6 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
                 // Extract the substring up to the first left parenthesis
             }
 
-            counter = 0;
-            // myNvml_ptr->measure_init();
-            myNvml_ptr->measure_start(result.c_str());
         }
         else
         {
@@ -191,8 +189,8 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
              * 2. Get number of thread blocks in the kernel
              * 3. Print the thread instruction counters
              * 4. Release the lock*/
-            CUDA_SAFECALL(cudaDeviceSynchronize());
-            myNvml_ptr->measure_stop();
+            // CUDA_SAFECALL(cudaDeviceSynchronize());
+            // myNvml_ptr->measure_stop();
 
             int num_ctas = 0;
             if (cbid == API_CUDA_cuLaunchKernel_ptsz ||
@@ -209,4 +207,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
 void nvbit_at_term()
 {
     // debug_printf("Total app instructions: %ld\n", tot_app_instrs);
+    myNvml_ptr->measure_stop();
+    pthread_mutex_unlock(&mutex);
+    // pthread_mutex_unlock(&mutex);
 }
