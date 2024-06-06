@@ -93,7 +93,22 @@ myNvml::~myNvml()
 
 void myNvml::measure_init()
 {
-    // cudaEventRecord(start);
+    debug_printf("Measure Init start \n");
+    checkCudaNvmlErrors(nvmlInit());
+    checkCudaNvmlErrors(nvmlDeviceGetHandleByIndex(target_device, &device));
+    char temp[256];
+    debug_printf("freq_mode: %d\n", _freq_mode);
+    //checkCudaNvmlErrors(nvmlInit());
+    sprintf(temp, "output_%d_%d_%d_%d_%d_%d_%s_%d_%d.csv",
+            target_device, _freq_mode, _bin_policy, _min_freq, _max_freq, _step_freq,
+            bench_name, _sampling_interval, _reset_interval);
+    ofile = fopen(temp, "w");
+    // otfile = fopen("time.csv", "w");
+    reset();
+    fprintf(ofile, "Benchmark,Kernel,Timestamp,Freq,FreqMode,BinPolicy,Power\n");
+    start_flag++;
+    debug_printf("Measure Init Ends \n");
+    // fseek(ofile, -1, SEEK_CUR);
 }
 
 void myNvml::measure_fin()
@@ -102,6 +117,7 @@ void myNvml::measure_fin()
     fclose(ofile);
     checkCudaNvmlErrors(nvmlDeviceResetGpuLockedClocks(device));
     nvmlShutdown();
+    debug_printf("Measure fin End\n");
 }
 
 // We will measured power only once for kernel
@@ -118,23 +134,6 @@ void myNvml::reset()
 
 void myNvml::measure_start(const char *k_name)
 {
-    if (start_flag == 0)
-    {
-        char temp[256];
-        start_flag++;
-        debug_printf("Measure start\n");
-        debug_printf("freq_mode: %d\n", _freq_mode);
-        checkCudaNvmlErrors(nvmlInit());
-        checkCudaNvmlErrors(nvmlDeviceGetHandleByIndex(target_device, &device));
-        sprintf(temp, "output_%d_%d_%d_%d_%d_%d_%s_%d_%d.csv",
-                target_device, _freq_mode, _bin_policy, _min_freq, _max_freq, _step_freq,
-                bench_name, _sampling_interval, _reset_interval);
-        ofile = fopen(temp, "w");
-        // otfile = fopen("time.csv", "w");
-        reset();
-        fprintf(ofile, "Benchmark,Kernel,Timestamp,Freq,FreqMode,BinPolicy,Power\n");
-        // fseek(ofile, -1, SEEK_CUR);
-    }
     if (_bin_policy == 10) // FIXME
     {
         strncpy(kernel_name, k_name, sizeof(kernel_name));
@@ -176,11 +175,14 @@ void myNvml::measure_energy_thread()
 {
     // unsigned long long energy = 0;
     // double powerDiff = 0;
+    debug_printf("Meausre energy thread start\n");
     unsigned int gpu_clock = 0;
     // Get GPU clock and change GPU clock
+    debug_printf("Get frequency \n");
     checkCudaNvmlErrors(nvmlDeviceGetClockInfo(device, NVML_CLOCK_GRAPHICS, &gpu_clock));
     //  Get power Usage
     unsigned int powerUsage = 0;
+    debug_printf("Get power \n");
     checkCudaNvmlErrors(nvmlDeviceGetPowerUsage(device, &powerUsage));
     total_power += powerUsage;
 
@@ -198,6 +200,7 @@ void myNvml::measure_energy_thread()
     // debug_printf("power from energy: %lf\n", powerDiff);
 
     // random bin frequency mode
+    debug_printf("Freq mode:\n",_freq_mode);
     if (_freq_mode == FREQ_MODE::ORG)
     {
         // Nothing
@@ -242,9 +245,11 @@ void myNvml::measure_energy_thread()
         checkCudaNvmlErrors(nvmlDeviceSetGpuLockedClocks(device, target_freq, target_freq));
     }
 
+    debug_printf("Writing to file\n");
     // Kernel,Timestamp,Freq,Power
     fprintf(ofile, "%s,%s,%u,%u,%u,%u,%u\n", bench_name, kernel_name, num_call, gpu_clock, _freq_mode, _bin_policy, powerUsage);
     // fprintf(ofile, "%u,%u,%f", gpu_clock, powerUsage, powerDiff);
     prev_power = powerUsage;
     num_call++;
+    debug_printf("Measurement Ends\n");
 }

@@ -21,7 +21,6 @@ BinManager::BinManager(int start_frq, int end_frq, int distance, int sampling_in
 }
 
 // Function to get the frequency of a randomly chosen bin with counter < maximumCounter
-
 int BinManager::getFreq()
 {
     if (freq_bins.empty())

@@ -111,7 +111,8 @@ void nvbit_at_init()
     printf("%s\n", pad.c_str());
     pthread_mutex_init(&mutex, NULL);
     pthread_mutex_init(&mutex_nvml, NULL);
-    pthread_mutex_lock(&mutex_nvml);
+    //pthread_mutex_lock(&mutex_nvml);
+    myNvml_ptr->measure_init();
     myNvml_ptr->measure_start("");
 }
 
@@ -191,6 +192,6 @@ void nvbit_at_term()
 {
     // debug_printf("Total app instructions: %ld\n", tot_app_instrs);
     myNvml_ptr->measure_stop();
-    pthread_mutex_unlock(&mutex);
-    // pthread_mutex_unlock(&mutex);
+    myNvml_ptr->measure_fin();
+    pthread_mutex_unlock(&mutex_nvml);
 }
