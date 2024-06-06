@@ -19,32 +19,58 @@ void check(T result, char const *const func, const char *const file, int const l
 
 myNvml::myNvml()
 {
-    const char *envVarValue = std::getenv("BENCH_NAME");
-    if (envVarValue != NULL)
-    {
-        strncpy(bench_name, envVarValue, sizeof(bench_name));
-    }
+    if (getenv("BENCH_NAME") != NULL)
+        strncpy(bench_name, getenv("BENCH_NAME"), sizeof(bench_name));
     else
-    {
         strncpy(bench_name, "unknown", sizeof(bench_name));
-    }
     debug_printf("BENCH_NAME= %s\n", bench_name);
-    target_device = std::atoi(getenv("CUDA_VISIBLE_DEVICES")); // Same name with NVBit
-    debug_printf("device = %d\n", target_device);
-    _freq_mode = std::atoi(getenv("FREQ_MODE"));
+
+    if (getenv("DEVICES_ID") != NULL)
+        target_device = std::atoi(getenv("DEVICES_ID"));
+    else
+        target_device = 0;
+    debug_printf("device_id = %d\n", target_device);
+
+    if (getenv("FREQ_MODE") != NULL)
+        _freq_mode = std::atoi(getenv("FREQ_MODE"));
+    else
+        _freq_mode = 0;
     debug_printf("freq_mode= %d\n", _freq_mode);
-    _bin_policy = std::atoi(getenv("BIN_POLICY"));
+
+    if (getenv("BIN_POLICY") != NULL)
+        _bin_policy = std::atoi(getenv("BIN_POLICY"));
+    else
+        _bin_policy = 0;
     debug_printf("bin_policy= %d\n", _bin_policy);
-    start_flag = 0;
-    _min_freq = std::atoi(getenv("MIN_FREQ"));
+
+    if (getenv("MIN_FREQ") != NULL)
+        _min_freq = std::atoi(getenv("MIN_FREQ"));
+    else
+        _min_freq = 500;
     debug_printf("min_freqw= %d\n", _min_freq);
-    _max_freq = std::atoi(getenv("MAX_FREQ"));
+
+    if (getenv("MAX_FREQ") != NULL)
+        _max_freq = std::atoi(getenv("MAX_FREQ"));
+    else
+        _max_freq = 2000;
     debug_printf("max_freqw= %d\n", _max_freq);
-    _step_freq = std::atoi(getenv("STEP_FREQ"));
+
+    if (getenv("STEP_FREQ") != NULL)
+        _step_freq = std::atoi(getenv("STEP_FREQ"));
+    else
+        _step_freq = 500;
     debug_printf("step_freq= %d\n", _step_freq);
-    _sampling_interval = std::atoi(getenv("SAMPLING_INTERVAL"));
+
+    if (getenv("SAMPLING_INTERVAL") != NULL)
+        _sampling_interval = std::atoi(getenv("SAMPLING_INTERVAL"));
+    else
+        _sampling_interval = 50;
     debug_printf("sampling interval= %d\n", _sampling_interval);
-    _reset_interval = std::atoi(getenv("RESET_INTERVAL"));
+
+    if (getenv("RESET_INTERVAL") != NULL)
+        _reset_interval = std::atoi(getenv("RESET_INTERVAL"));
+    else
+        _reset_interval = 2000;
     debug_printf("reset_interval= %d\n", _reset_interval);
 
     CBT = new CallBackTimer();
@@ -55,6 +81,7 @@ myNvml::myNvml()
     prev_avg_power = 0;
     total_power = 0;
     isFixed = false;
+    debug_printf("myNvml constructor Ends\n");
 }
 myNvml::~myNvml()
 {
