@@ -85,16 +85,15 @@ myNvml::myNvml()
 }
 myNvml::~myNvml()
 {
-    // cudaEventDestroy(start);
-    // cudaEventDestroy(stop);
     delete CBT;
     delete bm;
 }
 
 void myNvml::measure_init()
 {
-    debug_printf("Measure Init start \n");
+    debug_printf("======>> Measure Init \n");
     checkCudaNvmlErrors(nvmlInit());
+    sleep(1);
     checkCudaNvmlErrors(nvmlDeviceGetHandleByIndex(target_device, &device));
     char temp[256];
     debug_printf("freq_mode: %d\n", _freq_mode);
@@ -103,21 +102,20 @@ void myNvml::measure_init()
             target_device, _freq_mode, _bin_policy, _min_freq, _max_freq, _step_freq,
             bench_name, _sampling_interval, _reset_interval);
     ofile = fopen(temp, "w");
-    // otfile = fopen("time.csv", "w");
     reset();
     fprintf(ofile, "Benchmark,Kernel,Timestamp,Freq,FreqMode,BinPolicy,Power\n");
-    start_flag++;
-    debug_printf("Measure Init Ends \n");
-    // fseek(ofile, -1, SEEK_CUR);
+    fflush(ofile);
+    debug_printf("<<====== Measure Init \n");
 }
 
 void myNvml::measure_fin()
 {
-    debug_printf("Measure fin\n");
+    debug_printf("======>> Measure Fin \n");
     fclose(ofile);
-    checkCudaNvmlErrors(nvmlDeviceResetGpuLockedClocks(device));
+    //checkCudaNvmlErrors(nvmlDeviceResetGpuLockedClocks(device));
     nvmlShutdown();
-    debug_printf("Measure fin End\n");
+    sleep(1);
+    debug_printf("<<====== Measure Fin \n");
 }
 
 // We will measured power only once for kernel
@@ -134,6 +132,8 @@ void myNvml::reset()
 
 void myNvml::measure_start(const char *k_name)
 {
+    debug_printf("======>> Measure start \n");
+
     if (_bin_policy == 10) // FIXME
     {
         strncpy(kernel_name, k_name, sizeof(kernel_name));
@@ -157,11 +157,12 @@ void myNvml::measure_start(const char *k_name)
             debug_printf("Power of Kernel(%s) is already measured \n", k_name);
         }
     }
+    debug_printf("<<====== \n");
 }
 
 void myNvml::measure_stop()
 {
-    debug_printf("measure_stop(%s)\n", __func__);
+    debug_printf("======>> measure stop\n");
     CBT->stop();
     // float milliseconds = 0;
     // cudaEventRecord(stop);
@@ -169,13 +170,14 @@ void myNvml::measure_stop()
     // cudaEventElapsedTime(&milliseconds, start, stop);
     // fprintf(otfile, "%f\n", milliseconds);
     // measure_fin();
+    debug_printf("<<====== Measure stop\n");
 }
 
 void myNvml::measure_energy_thread()
 {
     // unsigned long long energy = 0;
     // double powerDiff = 0;
-    debug_printf("Meausre energy thread start\n");
+    debug_printf("======>> Measure energy thread\n");
     unsigned int gpu_clock = 0;
     // Get GPU clock and change GPU clock
     debug_printf("Get frequency \n");
@@ -251,5 +253,5 @@ void myNvml::measure_energy_thread()
     // fprintf(ofile, "%u,%u,%f", gpu_clock, powerUsage, powerDiff);
     prev_power = powerUsage;
     num_call++;
-    debug_printf("Measurement Ends\n");
+    debug_printf("<<====== Measurement Energy thread \n");
 }

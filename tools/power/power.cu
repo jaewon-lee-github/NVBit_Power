@@ -150,6 +150,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
             pthread_mutex_lock(&mutex);
 
 
+	    /*
             debug_printf("%s\n", nvbit_get_func_name(ctx, p->f));
             std::string inputString(nvbit_get_func_name(ctx, p->f));
             debug_printf("input_string: %s\n", inputString.c_str());
@@ -163,6 +164,7 @@ void nvbit_at_cuda_event(CUcontext ctx, int is_exit, nvbit_api_cuda_t cbid,
                 result = inputString.substr(0, pos);
                 // Extract the substring up to the first left parenthesis
             }
+	    */
 
         }
         else
